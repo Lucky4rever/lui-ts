@@ -1,0 +1,18 @@
+{
+  "display": "Node 23",
+  "_version": "23.0.0",
+
+  "compilerOptions": {
+    "outDir": "dist",
+    "lib": ["es2024", "DOM"],
+    "module": "Node16",
+    "target": "es2024",
+
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "moduleResolution": "node16",
+
+  },
+  "include": ["src"]
+}

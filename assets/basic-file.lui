@@ -1,0 +1,13 @@
+ADD width 50vw //*size
+ADD height 50vh
+ADD margin auto
+ADD margin $all 8px
+ADD padding $left $right 40px
+ADD background blue
+ADD color white
+ADD border 2px solid black
+ADD font-size 40px //*font
+ADD position absolute //*position
+ADD top 10%
+ADD left 10%
+ADD display block
