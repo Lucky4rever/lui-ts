@@ -29,7 +29,7 @@ class Tokenizer {
       // Обробка коментарів (починаються з //)
       if (char === '/' && this.peekNext() === '/') {
         // Перед коментарем може бути значення
-        if (tokens.length > 0 && tokens[tokens.length - 1].key === 'EQUALS') {
+        if (tokens.length > 0 && tokens[tokens.length - 1]?.key === 'EQUALS') {
           // Пропускаємо пробіли після EQUALS
           while (this.isWhitespace(this.peek())) {
             this.consume();

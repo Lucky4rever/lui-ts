@@ -44,7 +44,7 @@ class DependencyInjector {
           combinedContent = nestedContent + '\n' + combinedContent;
           nestedPaths.forEach(p => filePaths.add(p));
         } catch (error) {
-          throw new Error(`Failed to load ${type.toLowerCase()} at ${fullImportPath}: ${error}`);
+          throw new Error(`Failed to load ${type?.toLowerCase()} at ${fullImportPath}: ${error}`);
         }
       }
     }

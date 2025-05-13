@@ -1,7 +1,6 @@
 const KEYWORDS = [
   'ADD',
   'IMPORT',
-  'STYLE',
   'VAR',
   'LAYER',
   'TEMPLATE'

@@ -55,7 +55,7 @@ class Processor {
       processedValues.push(...this.processInlineTokens(lineTokens));
     }
 
-    return processedValues;
+    return this.removeDuplicates(processedValues);
   }
 
   private groupTokensByLine(tokens: TokenValue[]): TokenValue[][] {
@@ -315,6 +315,29 @@ class Processor {
     }
 
     return value;
+  }
+
+  private removeDuplicates(values: ProcessedValue[]): ProcessedValue[] {
+    const uniqueValues: ProcessedValue[] = [];
+    const seen = new Map<string, boolean>();
+
+    for (const item of values) {
+      // Для LAYER токенів не застосовуємо дедуплікацію
+      if (item.property === 'LAYER') {
+        uniqueValues.push(item);
+        continue;
+      }
+
+      // Створюємо унікальний ключ для порівняння
+      const key = `${item.property}:${JSON.stringify(item.values)}`;
+      
+      if (!seen.has(key)) {
+        seen.set(key, true);
+        uniqueValues.push(item);
+      }
+    }
+
+    return uniqueValues;
   }
 }
 

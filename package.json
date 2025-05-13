@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "description": "",
   "main": "dist/index.js",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "type": "commonjs",
   "bin": {
     "lui": "./dist/index.js"
@@ -22,6 +24,6 @@
     "@swc/cli": "^0.7.3",
     "@swc/core": "^1.11.24",
     "@types/node": "^22.13.5",
-    "typescript": "^5.7.3"
+    "typescript": "^5.8.3"
   }
 }

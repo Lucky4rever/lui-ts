@@ -13,6 +13,8 @@ import { parseCliArgs, Properties } from './options';
 //   mode: 'standard',
 // };
 
+const startTime = Date.now();
+
 const args = process.argv.slice(2);
 
 const properties: Properties = parseCliArgs(args);
@@ -32,7 +34,6 @@ if (!properties.inputFile) {
   
   const tokenizer = new Tokenizer();
   const tokens = tokenizer.tokenize(combinedContent);
-  // console.log("tokens", tokens);
 
   const processor = new Processor(store);
   const processedValues = processor.process(tokens);
@@ -54,4 +55,7 @@ if (!properties.inputFile) {
   const outputPath = properties.outputFile ?? `${inputPath.substring(0, inputPath.lastIndexOf('.'))}.css`;
   await fs.writeFile(outputPath, cssContent, { encoding: 'utf-8', flag: 'w' });
   console.log(`CSS content written to ${outputPath}`);
+
+  const endTime = Date.now();
+  console.log(`Execution time: ${(endTime - startTime) / 1000} seconds`);
 })(properties);
