@@ -11,7 +11,6 @@ class DependencyInjector {
   }
 
   private resolveFilePath(basePath: string, importPath: string): string {
-    // Додаємо .lui, якщо розширення не вказане
     const ext = path.extname(importPath);
     const resolvedPath = ext === '' ? `${importPath}.lui` : importPath;
     return path.join(basePath, resolvedPath);
@@ -65,12 +64,10 @@ class DependencyInjector {
   private getLayerName(filePath: string): string {
     const options = Options.instance.getOptions();
     
-    // Для головного файлу беремо inputFile без розширення
     if (path.resolve(filePath) === path.resolve(options.inputFile)) {
       return path.basename(options.inputFile, path.extname(options.inputFile));
     }
     
-    // Для імпортованих файлів беремо їх ім'я без розширення
     return path.basename(filePath, path.extname(filePath));
   }
 }

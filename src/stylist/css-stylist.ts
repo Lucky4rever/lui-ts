@@ -7,33 +7,32 @@ import { ClassNameFormatMode, selectClassNameFormatter } from "./class-formatter
 export const CSS_FORMAT_MODES = new Set(['minimalistic', 'standard', 'pretty']);
 export type CssFormatModeType = typeof CSS_FORMAT_MODES extends Set<infer T> ? T : never;
 
-export type CssParserOptions = {
+export type CssStylistOptions = {
   processedValues: ProcessedValue[];
   classNameFormat: ClassNameFormatMode;
   mode?: CssFormatModeType;
 };
 
-// Регулярні вирази для перевірки значень
 const UNIT_REGEX = /(^|\s)(\d+)(px|em|rem|%|vw|vh|vmin|vmax|ch|ex|mm|cm|in|pt|pc)(\s|$)/;
 const COLOR_HEX_REGEX = /^#([0-9a-f]{3}){1,2}$/i;
 const COLOR_FUNC_REGEX = /^rgb(a?)\(.*\)$|^hsl(a?)\(.*\)$/i;
 const NUMERIC_REGEX = /^-?\d*\.?\d+$/;
 
-class CssParser {
+class CssStylist {
   private processedValues: ProcessedValue[];
   private classNameFormat: ClassNameFormatMode;
   private mode: CssFormatModeType;
   private layersEnabled: boolean;
   private layerStack: string[] = [];
 
-  constructor(options: CssParserOptions);
+  constructor(options: CssStylistOptions);
   constructor(
     processedValues: ProcessedValue[],
     classNameFormat: ClassNameFormatMode,
     mode?: CssFormatModeType
   );
   constructor(
-    arg1: CssParserOptions | ProcessedValue[],
+    arg1: CssStylistOptions | ProcessedValue[],
     arg2?: ClassNameFormatMode,
     arg3: CssFormatModeType = 'standard'
   ) {
@@ -74,11 +73,9 @@ class CssParser {
     const trimmedValue = value.trim();
     if (!trimmedValue) throw new Error(`Empty value for property ${property}`);
   
-    // Спеціальна обробка для властивостей, які можуть містити кілька значень
     const COMPOUND_PROPERTIES = new Set(['border', 'margin', 'padding', 'background', 'font', 'animation']);
     
     if (COMPOUND_PROPERTIES.has(property)) {
-      // Для складених властивостей повертаємо значення як є
       return trimmedValue;
     }
   
@@ -135,14 +132,12 @@ class CssParser {
     const lines: string[] = [];
     const allLayers = new Set<string>();
 
-    // Збираємо всі шари
     for (const item of this.processedValues) {
       if (item.property === 'LAYER') {
         allLayers.add(item.values[0] as string);
       }
     }
 
-    // Додаємо імпорти шарів на початку
     if (this.layersEnabled && allLayers.size > 0) {
       lines.push(`@layer ${Array.from(allLayers).join(', ')};`);
     }
@@ -172,4 +167,4 @@ class CssParser {
   }
 }
 
-export default CssParser;
+export default CssStylist;

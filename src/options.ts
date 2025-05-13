@@ -1,6 +1,6 @@
 import path from "node:path";
-import { ClassNameFormatMode, classNameFormatters } from "./parser/class-formatter";
-import { CSS_FORMAT_MODES, CssFormatModeType } from "./parser/css-parser";
+import { ClassNameFormatMode, classNameFormatters } from "./stylist/class-formatter";
+import { CSS_FORMAT_MODES, CssFormatModeType } from "./stylist/css-stylist";
 
 export interface Properties {
   inputFile: string;
@@ -80,7 +80,6 @@ export function parseCliArgs(args: string[]): Properties {
       }
       i++;
     } 
-    // Обробка позиційних параметрів
     else {
       if (!result.inputFile) {
         result.inputFile = path.resolve(arg);

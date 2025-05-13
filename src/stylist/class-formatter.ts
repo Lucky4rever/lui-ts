@@ -2,11 +2,9 @@ import { ProcessedValue } from "../processor/processed-value";
 
 export type ClassFormatter = (value: ProcessedValue) => string;
 
-// Набори для швидкого доступу до спеціальних значень
 const PERCENTAGE_VALUES = new Set(['%', 'pct', 'percent']);
 const SPECIAL_CHARACTERS = new Set(['#', '(', ')', ',', '.', '/']);
 
-// Функція для створення безпечного CSS-класу
 const safeClassName = (str: string): string => {
   let result = '';
   for (const char of str) {

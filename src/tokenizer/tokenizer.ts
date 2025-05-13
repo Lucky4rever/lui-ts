@@ -26,19 +26,14 @@ class Tokenizer {
         continue;
       }
       
-      // Обробка коментарів (починаються з //)
       if (char === '/' && this.peekNext() === '/') {
-        // Перед коментарем може бути значення
         if (tokens.length > 0 && tokens[tokens.length - 1]?.key === 'EQUALS') {
-          // Пропускаємо пробіли після EQUALS
           while (this.isWhitespace(this.peek())) {
             this.consume();
           }
-          // Якщо після пробілів йде коментар, значить значення відсутнє
           if (this.peek() === '/' && this.peekNext() === '/') {
             throw this.error('Очікувалось значення після =');
           }
-          // Парсимо значення
           tokens.push(this.parseValueAfterEquals());
         }
         tokens.push(this.parseComment());
@@ -92,13 +87,10 @@ class Tokenizer {
       
       if (char === '=') {
         tokens.push(this.parseSymbol());
-        // Після EQUALS парсимо значення
         if (!this.isAtEnd()) {
-          // Пропускаємо пробіли
           while (this.isWhitespace(this.peek())) {
             this.consume();
           }
-          // Якщо не кінець і не коментар, парсимо значення
           if (!this.isAtEnd() && !(this.peek() === '/' && this.peekNext() === '/')) {
             tokens.push(this.parseValueAfterEquals());
           }
@@ -128,23 +120,17 @@ class Tokenizer {
     }
     
     if (this.isLetter(char)) {
-      // Може бути звичайне слово або типізоване значення
-      const startPos = this.current;
       let value = '';
       
       while (this.isLetter(this.peek())) {
         value += this.consume();
       }
       
-      // Перевіряємо, чи це тип
       if (VALUE_TYPES_SET.has(value as ValueType)) {
-        // Це тип, отже очікуємо значення після нього
-        // Пропускаємо пробіли
         while (this.isWhitespace(this.peek())) {
           this.consume();
         }
         
-        // Парсимо саме значення
         if (this.peek() === '{') {
           const refToken = this.parseVariableReference();
           return {
@@ -157,7 +143,6 @@ class Tokenizer {
           throw this.error(`Очікувалось посилання на змінну після типу ${value}`);
         }
       } else {
-        // Це просто слово
         return { key: "VALUE", value };
       }
     }
@@ -188,20 +173,17 @@ class Tokenizer {
   }
 
   private parseLayerMarker(): TokenValue {
-    this.advance('LAYER '.length); // Пропускаємо "LAYER "
+    this.advance('LAYER '.length);
     
-    // Читаємо назву шару
     let name = '';
     while (!this.isAtEnd() && !this.isWhitespace(this.peek()) && this.peek() !== '\n') {
       name += this.consume();
     }
     
-    // Пропускаємо пробіли між назвою і дією
     while (this.isWhitespace(this.peek())) {
       this.consume();
     }
     
-    // Читаємо дію (START/END)
     let action = '';
     while (!this.isAtEnd() && !this.isWhitespace(this.peek()) && this.peek() !== '\n') {
       action += this.consume();
@@ -211,7 +193,6 @@ class Tokenizer {
       throw this.error(`Невідома дія для LAYER: ${action}`);
     }
     
-    // Пропускаємо перехід на новий рядок після маркера
     if (this.peek() === '\n') {
       this.consume();
     }
@@ -224,11 +205,10 @@ class Tokenizer {
   }
 
   private parseColor(): TokenValue {
-    this.consume(); // Skip #
+    this.consume();
     let value = '';
     
-    // Hex color може бути 3 або 6 символів
-    const hexChars = /[0-9a-fA-F]/;
+    const hexChars = /[0-9a-fA-F]/; // HEX can be 3 or 6 characters
     while (hexChars.test(this.peek() ?? "") && value.length < 6) {
       value += this.consume();
     }
@@ -239,33 +219,28 @@ class Tokenizer {
   private parseNumber(): TokenValue {
     let value = '';
     
-    // Спочатку збираємо всі цифри
     while (this.isDigit(this.peek())) {
       value += this.consume();
     }
     
-    // Перевіряємо на дробову частину
     if (this.peek() === '.' && this.isDigit(this.peekNext())) {
-      value += this.consume(); // Consume .
+      value += this.consume();
       while (this.isDigit(this.peek())) {
         value += this.consume();
       }
     }
     
-    // Потім збираємо всі літери (для одиниць виміру)
     while (this.isLetter(this.peek())) {
       value += this.consume();
     }
     
-    // Спроба перетворити на число, якщо немає літер
     const numericValue = /[a-zA-Z]/.test(value) ? value : Number(value);
     
     return { key: "VALUE", value: numericValue };
   }
 
-  // Решта методів залишаються без змін...
   private parseIdentifier(): TokenValue {
-    this.consume(); // Skip $
+    this.consume();
     let value = '';
     
     while (this.isIdentifierChar(this.peek()) && !this.isAtEnd()) {
@@ -298,7 +273,7 @@ class Tokenizer {
   }
 
   private parseVariableReference(): TokenValue {
-    this.consume(); // Skip {
+    this.consume();
     let value = '';
     
     while (!this.isAtEnd() && this.peek() !== '}') {
@@ -309,7 +284,7 @@ class Tokenizer {
       throw this.error('Незакрита дужка');
     }
     
-    this.consume(); // Skip }
+    this.consume();
     
     let type: ValueType | undefined;
     if (this.isLetter(this.peek())) {

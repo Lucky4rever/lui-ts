@@ -1,17 +1,10 @@
 import fs from 'node:fs/promises';
 import Tokenizer from './tokenizer/tokenizer';
 import store from './store/store';
-import Processor from './processor/process';
-import CssParser from './parser/css-parser';
+import Parser from './processor/parser';
+import CssStylist from './stylist/css-stylist';
 import DependencyInjector from './processor/dependency-injector';
 import { parseCliArgs, Properties } from './options';
-
-// const properties: Properties = {
-//   inputFile: '../assets/test3.lui',
-//   outputFile: undefined,
-//   classNameFormat: 'full-name',
-//   mode: 'standard',
-// };
 
 const startTime = Date.now();
 
@@ -35,12 +28,12 @@ if (!properties.inputFile) {
   const tokenizer = new Tokenizer();
   const tokens = tokenizer.tokenize(combinedContent);
 
-  const processor = new Processor(store);
-  const processedValues = processor.process(tokens);
+  const parser = new Parser(store);
+  const processedValues = parser.process(tokens);
 
-  const variables = processor.getVariables();
+  const variables = parser.getVariables();
 
-  const cssParser = new CssParser(
+  const cssParser = new CssStylist(
     processedValues, 
     properties.classNameFormat ?? 'minimalistic', 
     properties.mode ?? 'standard'
@@ -54,8 +47,9 @@ if (!properties.inputFile) {
 
   const outputPath = properties.outputFile ?? `${inputPath.substring(0, inputPath.lastIndexOf('.'))}.css`;
   await fs.writeFile(outputPath, cssContent, { encoding: 'utf-8', flag: 'w' });
-  console.log(`CSS content written to ${outputPath}`);
+  console.log('\x1b[33m%s\x1b[0m', `CSS content written to ${outputPath}`);
+  console.log('\x1b[36m%s\x1b[0m', `Generated CSS classes: ${processedValues.length}`);
 
   const endTime = Date.now();
-  console.log(`Execution time: ${(endTime - startTime) / 1000} seconds`);
+  console.log('\x1b[36m%s\x1b[0m', `Execution time: ${(endTime - startTime) / 1000} seconds`);
 })(properties);

@@ -21,7 +21,7 @@ function expandProperty(property: TokenProperty, identifier: Identifier): Proper
   return identifiedProperties;
 }
 
-class Processor {
+class Parser {
   private store: Store;
 
   constructor(store: Store) {
@@ -148,14 +148,6 @@ class Processor {
   ): ProcessedValue[] {
     const processedValues: ProcessedValue[] = [];
 
-    // console.log("Processing ADD statement...");
-    // console.log("Property Tokens:", propertyTokens);
-    // console.log("Identifier Tokens:", identifierTokens);
-    // console.log("Value Tokens:", valueTokens);
-    // console.log("Variable Tokens:", variableTokens);
-    // console.log("Variable Reference Tokens:", variableRefTokens);
-  
-    // Валідація вхідних даних
     if (!propertyTokens || propertyTokens.length === 0) {
       throw new Error("ADD statement requires at least one property");
     }
@@ -165,7 +157,6 @@ class Processor {
       throw new Error("Invalid property token in ADD statement");
     }
   
-    // Збираємо всі значення
     const allValueTokens = [
       ...(valueTokens || []),
       ...(variableTokens?.map(token => {
@@ -175,7 +166,7 @@ class Processor {
         throw new Error(`Invalid token type in variableTokens: ${token.key}`);
       }) || []),
       ...(variableRefTokens || [])
-    ];//.sort((a, b) => a.position - b.position); // Сортуємо за позицією в коді
+    ];
 
     if (allValueTokens.length === 0) {
       throw new Error("ADD statement requires at least one value");
@@ -183,8 +174,7 @@ class Processor {
   
     const values = allValueTokens.map(token => {
       if (token.key === "VALUE") {
-        const valueTypeToken = this.findValueTypeToken(token);
-        return this.resolveValue(token, valueTypeToken);
+        return this.resolveValue(token, undefined);
       } else if (token.key === "VARIABLE_REF") {
         return this.resolveVariableRef(token);
       }
@@ -209,7 +199,7 @@ class Processor {
     for (const property of expandedProperties) {
       processedValues.push({
         property,
-        values: [...values] // Копіюємо масив значень
+        values: [...values]
       });
     }
   
@@ -220,14 +210,6 @@ class Processor {
     return this.store.getVariables();
   }
   
-  // Допоміжний метод для пошуку VALUE_TYPE токена, що йде після VALUE токена
-  private findValueTypeToken(valueToken: TokenValue): TokenValue | undefined {
-    // Реалізація залежить від того, як ви зберігаєте позиції токенів
-    // Наприклад, можна шукати наступний токен після valueToken з типом VALUE_TYPE
-    return undefined;
-  }
-  
-  // Допоміжний метод для обробки змінних
   private resolveVariableRef(token: TokenValue): string {
     if (token.key !== "VARIABLE_REF") {
       throw new Error(`Invalid token type for variable reference: ${token.key}`);
@@ -264,12 +246,10 @@ class Processor {
 
     let valueTypeToken: TokenValue | undefined;
   
-    // Якщо є другий токен значення і це VALUE_TYPE
     if (valueTokens.length > 1 && valueTokens[1]?.key === "VALUE_TYPE") {
       valueTypeToken = valueTokens[1];
     }
   
-    // Зберігаємо змінну в store
     this.store.addVariable(
       variableToken.value,
       valueToken.value,
@@ -295,7 +275,6 @@ class Processor {
   private resolveValue(valueToken: TokenValue, valueTypeToken?: TokenValue): string {
     let value = "";
 
-    // Обробляємо значення
     if (valueToken.key === "VALUE") {
       value = `${(valueToken as { value: string | number }).value}`;
     } else if (valueToken.key === "VARIABLE_REF") {
@@ -309,7 +288,6 @@ class Processor {
       throw new Error(`Invalid value token: ${JSON.stringify(valueToken)}`);
     }
 
-    // Додаємо тип, якщо він є
     if (valueTypeToken?.key === "VALUE_TYPE") {
       value += valueTypeToken.value;
     }
@@ -322,13 +300,11 @@ class Processor {
     const seen = new Map<string, boolean>();
 
     for (const item of values) {
-      // Для LAYER токенів не застосовуємо дедуплікацію
       if (item.property === 'LAYER') {
         uniqueValues.push(item);
         continue;
       }
 
-      // Створюємо унікальний ключ для порівняння
       const key = `${item.property}:${JSON.stringify(item.values)}`;
       
       if (!seen.has(key)) {
@@ -341,4 +317,4 @@ class Processor {
   }
 }
 
-export default Processor;
+export default Parser;
