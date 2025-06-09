@@ -1,0 +1,9 @@
+VAR tablet-s   = 600px   // Маленькі планшети (наприклад, Galaxy Tab A)
+VAR tablet-m   = 768px   // Стандартні планшети (iPad Mini, вертикальна орієнтація)
+VAR tablet-l   = 800px   // Деякі великі планшети
+VAR tablet-xl  = 1024px  // iPad Pro 9.7", горизонтальна орієнтація
+
+VAR tb-s   = 600px
+VAR tb-m   = 768px
+VAR tb-l   = 800px
+VAR tb-xl  = 1024px

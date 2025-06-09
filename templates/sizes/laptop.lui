@@ -1,0 +1,13 @@
+VAR laptop-xs  = 920px
+VAR laptop-s   = 1280px  // Маленькі ноутбуки (11-13")
+VAR laptop-m   = 1366px  // Стандартні ноутбуки (HD)
+VAR laptop-l   = 1440px  // Ноутбуки з екранами 14-15.6" (Full HD)
+VAR laptop-xl  = 1600px  // Преміум-ноутбуки (QHD)
+VAR laptop-xxl = 1920px  // Великі ноутбуки/монітори (Full HD+)
+
+VAR lt-xs  = 920px
+VAR lt-s   = 1280px
+VAR lt-m   = 1366px
+VAR lt-l   = 1440px
+VAR lt-xl  = 1600px
+VAR lt-xxl = 1920px

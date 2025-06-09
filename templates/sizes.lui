@@ -1,0 +1,44 @@
+TEMPLATE (sizes/desktop)
+TEMPLATE (sizes/laptop)
+TEMPLATE (sizes/phone)
+TEMPLATE (sizes/tablet)
+
+VAR phone  = 480px   // Верхня межа для мобільних телефонів
+VAR tablet  = 1024px  // Верхня межа для планшетів
+VAR laptop  = 1440px  // Верхня межа для ноутбуків
+VAR desktop = 1920px // Всі розміри вище
+
+VAR pn  = 480px
+VAR tb  = 1024px
+VAR lt  = 1440px
+VAR dt = 1920px
+
+VAR xs = 320px
+VAR s = 576px
+VAR m = 768px
+VAR l = 992px
+VAR xl = 1200px
+VAR xxl = 1400px
+
+VAR xs = 320px
+VAR s = 576px
+VAR m = 768px
+VAR l = 992px
+VAR xl = 1200px
+VAR xxl = 1400px
+
+VAR interval-xxs = 1px
+VAR interval-xs = 2px
+VAR interval-s = 4px
+VAR interval-m = 8px
+VAR interval-l = 16px
+VAR interval-xl = 32px
+VAR interval-xxl = 64px
+
+VAR itv-xxs = 1px
+VAR itv-xs = 2px
+VAR itv-s = 4px
+VAR itv-m = 8px
+VAR itv-l = 16px
+VAR itv-xl = 32px
+VAR itv-xxl = 64px

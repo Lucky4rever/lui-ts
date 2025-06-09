@@ -1,0 +1,9 @@
+VAR desktop-m   = 1920px  // Стандартні монітори (Full HD)
+VAR desktop-l   = 2560px  // QHD/WQHD (2K)
+VAR desktop-xl  = 3840px  // UHD/4K (телевізори та профільні монітори)
+VAR desktop-xxl = 7680px  // 8K (преміум TV)
+
+VAR dt-m   = 1920px
+VAR dt-l   = 2560px
+VAR dt-xl  = 3840px
+VAR dt-xxl = 7680px

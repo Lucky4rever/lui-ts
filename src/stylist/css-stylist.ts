@@ -13,7 +13,8 @@ export type CssStylistOptions = {
   mode?: CssFormatModeType;
 };
 
-const UNIT_REGEX = /(^|\s)(\d+)(px|em|rem|%|vw|vh|vmin|vmax|ch|ex|mm|cm|in|pt|pc)(\s|$)/;
+const SIZE_REGEX = /^(max-content|min-content|fit-content|-webkit-fill-available)$/i;
+const UNIT_REGEX = /(^|\s)(auto|inherit|initial|revert|revert-layer|unset|(^-?\d+(\.?\d+)?)(px|em|rem|%|vw|vh|vmin|vmax|ch|ex|mm|cm|in|pt|pc))(\s|$)/i;
 const COLOR_HEX_REGEX = /^#([0-9a-f]{3}){1,2}$/i;
 const COLOR_FUNC_REGEX = /^rgb(a?)\(.*\)$|^hsl(a?)\(.*\)$/i;
 const NUMERIC_REGEX = /^-?\d*\.?\d+$/;
@@ -23,6 +24,7 @@ class CssStylist {
   private classNameFormat: ClassNameFormatMode;
   private mode: CssFormatModeType;
   private layersEnabled: boolean;
+  private mobileFirstEnamled: boolean;
   private layerStack: string[] = [];
 
   constructor(options: CssStylistOptions);
@@ -46,7 +48,10 @@ class CssStylist {
       this.mode = arg1.mode ?? 'standard';
     }
     
-    this.layersEnabled = Options.instance.getOptions().layers;
+    const options = Options.instance.getOptions();
+
+    this.layersEnabled = options.layers;
+    this.mobileFirstEnamled = options.mobileFirst;
   }
 
   private isCssFunction(value: string): boolean {
@@ -86,21 +91,42 @@ class CssStylist {
     if (NUMERIC_REGEX.test(trimmedValue)) {
       return `${trimmedValue}px`;
     }
+
+    if (SIZE_REGEX.test(trimmedValue)) {
+      return trimmedValue;
+    }
   
     throw new Error(`Invalid value '${value}' for property '${property}'. Expected a number with unit or valid CSS value.`);
   }
 
-  private formatBlock(className: string, property: string, value: string): string {
+  private formatBlock(className: string, pseudoClass: string, property: string, value: string): string {
     const cssValue = this.validateValue(value, property);
     const indent = this.getIndent();
     
     const formatMap: {[value: CssFormatModeType]: string} = {
-      minimalistic: `${indent}${className}{${property}:${cssValue}}`,
-      standard: `${indent}${className} {\n${indent}  ${property}: ${cssValue};\n${indent}}`,
-      pretty: `${indent}${className} {\n${indent}    ${property}: ${cssValue};\n${indent}}`
+      minimalistic: `${indent}${className}${pseudoClass}{${property}:${cssValue}}`,
+      standard: `${indent}${className}${pseudoClass} {\n${indent}  ${property}: ${cssValue};\n${indent}}`,
+      pretty: `${indent}${className}${pseudoClass} {\n${indent}    ${property}: ${cssValue};\n${indent}}\n`
     };
 
     return formatMap[this.mode] || `${indent}${className} { ${property}: ${cssValue}; }`;
+  }
+
+  private formatMediaQuery(condition: string, content: string): string {
+    const indent = this.getIndent();
+    if(!this.mobileFirstEnamled)  condition = condition.replace('min-width', 'max-width');
+    const validMedia = /^\((min-width|max-width):\s*([0-9]+(px|rem|em|%|vw|vh)|var\(--[a-zA-Z0-9-]+\))\)$/.test(condition);
+    if (!validMedia) {
+      throw new Error(`Invalid media query condition: ${condition}`);
+    }
+    
+    const formatMap: {[value: CssFormatModeType]: string} = {
+      minimalistic: `${indent}@media ${condition}{${content}}`,
+      standard: `${indent}@media ${condition} {\n${content}\n${indent}}`,
+      pretty: `${indent}@media ${condition} {\n${content}\n${indent}}\n`
+    };
+
+    return formatMap[this.mode] || `${indent}@media ${condition} { ${content} }`;
   }
 
   private formatLayer(layerName: string, action: 'START' | 'END'): string {
@@ -130,6 +156,7 @@ class CssStylist {
 
   public generateCss(): string {
     const lines: string[] = [];
+    const mediaGroups: Record<string, string[]> = {};
     const allLayers = new Set<string>();
 
     for (const item of this.processedValues) {
@@ -157,13 +184,31 @@ class CssStylist {
 
       const formatter = selectClassNameFormatter(this.classNameFormat);
       const className = formatter(item);
+      const pseudoClass = item.pseudoClass ?? '';
       const joinedValues = item.values.join(' ');
       const values = this.validateValue(joinedValues, item.property);
-      
-      lines.push(this.formatBlock(className, item.property, values));
+      const cssBlock = this.formatBlock(className, pseudoClass, item.property, values);
+
+      if (item.media) {
+        if (!mediaGroups[item.media]) {
+          mediaGroups[item.media] = [];
+        }
+        mediaGroups[item.media]?.push(cssBlock);
+      } else {
+        lines.push(cssBlock);
+      }
     }
 
-    return lines.join('\n').trim();
+    for (const [condition, blocks] of Object.entries(mediaGroups)) {
+      const content = blocks.join(this.mode === 'minimalistic' ? '' : '\n');
+      lines.push(this.formatMediaQuery(condition, content));
+    }
+
+    if (this.layersEnabled && this.layerStack.length > 0) {
+      lines.push('}');
+    }
+
+    return lines.join(this.mode === 'minimalistic' ? '' : '\n').trim();
   }
 }
 

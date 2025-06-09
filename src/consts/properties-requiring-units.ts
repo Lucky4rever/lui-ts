@@ -19,7 +19,6 @@ const PROPERTIES_REQUIRING_UNITS = [
   'bottom',
   'left',
   'font-size',
-  'line-height',
   'min-width',
   'max-width',
   'min-height',

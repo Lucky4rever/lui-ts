@@ -1,4 +1,4 @@
-const TOKEN_PROPERTY_INPUTS = [
+export const TOKEN_PROPERTY_INPUTS = [
   'accent-color',
   'align-content',
   'align-items',
@@ -336,6 +336,7 @@ const TOKEN_PROPERTY_INPUTS = [
   'text-transform',
   'text-underline-offset',
   'text-underline-position',
+  'text-wrap',
   'top',
   'transform',
   'transform-origin',
@@ -361,5 +362,5 @@ const TOKEN_PROPERTY_INPUTS = [
   'zoom',
 ] as const;
 
-export type TokenProperty = typeof TOKEN_PROPERTY_INPUTS[number];
-export const TOKEN_PROPERTIES_SET = new Set(TOKEN_PROPERTY_INPUTS);
+export type Property = typeof TOKEN_PROPERTY_INPUTS[number];
+export const PROPERTIES_SET = new Set(TOKEN_PROPERTY_INPUTS);

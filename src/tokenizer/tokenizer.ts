@@ -1,6 +1,8 @@
+import { PSEUDO_CLASSES_SET, PseudoClass } from "../consts/css-seudo-classes";
+import { CSS_VALUES_SET, CssValue } from "../consts/css-values";
 import { IDENTIFIERS_SET, Identifier } from "../consts/identifiers";
 import { KEYWORDS_SET, Keyword } from "../consts/keywords";
-import { TOKEN_PROPERTIES_SET, TokenProperty } from "../consts/token-property";
+import { PROPERTIES_SET, Property } from "../consts/token-property";
 import { ValueType, VALUE_TYPES_SET } from "../consts/value-types";
 import { TokenValue } from "./token-value";
 
@@ -10,13 +12,13 @@ class Tokenizer {
   private column = 1;
   private input: string = '';
 
+  constructor(private tokens: TokenValue[] = []) {}
+
   tokenize(input: string): TokenValue[] {
     this.input = input;
     this.current = 0;
     this.line = 1;
     this.column = 1;
-    
-    const tokens: TokenValue[] = [];
     
     while (this.current < this.input.length) {
       const char = this.peek();
@@ -27,21 +29,26 @@ class Tokenizer {
       }
       
       if (char === '/' && this.peekNext() === '/') {
-        if (tokens.length > 0 && tokens[tokens.length - 1]?.key === 'EQUALS') {
+        if (this.tokens.length > 0 && this.tokens[this.tokens.length - 1]?.key === 'EQUALS') {
           while (this.isWhitespace(this.peek())) {
             this.consume();
           }
           if (this.peek() === '/' && this.peekNext() === '/') {
             throw this.error('Очікувалось значення після =');
           }
-          tokens.push(this.parseValueAfterEquals());
+          this.tokens.push(this.parseValueAfterEquals());
         }
-        tokens.push(this.parseComment());
+        this.tokens.push(this.parseComment());
+        continue;
+      }
+
+      if (char === '-' && this.isDigit(this.peekNext())) {
+        this.tokens.push(this.parseNumber());
         continue;
       }
       
       if (char === '\n') {
-        tokens.push({ key: "NEWLINE" });
+        this.tokens.push({ key: "NEWLINE" });
         this.consume();
         this.line++;
         this.column = 1;
@@ -49,59 +56,71 @@ class Tokenizer {
       }
 
       if (char === 'L' && this.input.startsWith('LAYER ', this.current)) {
-        tokens.push(this.parseLayerMarker());
+        this.tokens.push(this.parseLayerMarker());
+        continue;
+      }
+
+      if (char === '@') {
+        this.tokens.push(this.parseMediaQuery());
         continue;
       }
       
       if (char === '$') {
-        tokens.push(this.parseIdentifier());
+        this.tokens.push(this.parseIdentifier());
+        continue;
+      }
+
+      if (char === ':') {
+        this.tokens.push(this.parsePseudoClass());
+        continue;
+      }
+
+      if (this.isDigit(char) || 
+        (char === '.' && this.isDigit(this.peekNext())) ||
+        (char === '/' && this.isDigit(this.peekNext()))) {
+        this.tokens.push(this.parseNumber());
         continue;
       }
       
       if (this.isLetter(char)) {
         const token = this.parseWord();
-        tokens.push(token);
-        continue;
-      }
-      
-      if (this.isDigit(char)) {
-        tokens.push(this.parseNumber());
+        this.tokens.push(token);
         continue;
       }
       
       if (char === '%') {
-        tokens.push({ key: "VALUE_TYPE", value: "%" });
+        this.tokens.push({ key: "VALUE_TYPE", value: "%" });
         this.consume();
         continue;
       }
       
       if (char === '{') {
-        tokens.push(this.parseVariableReference());
+        this.tokens.push(this.parseVariableReference());
         continue;
       }
       
       if (char === '#') {
-        tokens.push(this.parseColor());
+        this.tokens.push(this.parseColor());
         continue;
       }
       
       if (char === '=') {
-        tokens.push(this.parseSymbol());
+        this.tokens.push(this.parseSymbol());
         if (!this.isAtEnd()) {
           while (this.isWhitespace(this.peek())) {
             this.consume();
           }
           if (!this.isAtEnd() && !(this.peek() === '/' && this.peekNext() === '/')) {
-            tokens.push(this.parseValueAfterEquals());
+            this.tokens.push(this.parseValueAfterEquals());
           }
         }
         continue;
       }
       
-      tokens.push(this.parseSymbol());
+      this.tokens.push(this.parseSymbol());
     }
     
-    return tokens;
+    return this.tokens;
   }
 
   private parseValueAfterEquals(): TokenValue {
@@ -119,35 +138,37 @@ class Tokenizer {
       return this.parseNumber();
     }
     
-    if (this.isLetter(char)) {
+    if (this.isLetter(char) || char === "'") {
       let value = '';
       
-      while (this.isLetter(this.peek())) {
+      while (this.isLetter(this.peek()) || this.peek() === "'") {
         value += this.consume();
       }
       
-      if (VALUE_TYPES_SET.has(value as ValueType)) {
+      if (VALUE_TYPES_SET.has(value as ValueType | never)) {
         while (this.isWhitespace(this.peek())) {
           this.consume();
         }
         
         if (this.peek() === '{') {
           const refToken = this.parseVariableReference();
+
+          if (refToken.key !== 'VALUE')  throw this.error(`Expected variable reference after type ${value}`);
+
           return {
             key: 'VARIABLE_REF',
-            //@ts-ignore
-            ref: refToken.value,
+            ref: refToken.value.toString(),
             type: value as ValueType
           };
         } else {
-          throw this.error(`Очікувалось посилання на змінну після типу ${value}`);
+          throw this.error(`Expected variable reference after type ${value}`);
         }
       } else {
         return { key: "VALUE", value };
       }
     }
     
-    throw this.error(`Невідомий формат значення після =: ${char}`);
+    throw this.error(`Unexpected character after '=': ${char}`);
   }
 
   private parseComment(): TokenValue {
@@ -208,8 +229,8 @@ class Tokenizer {
     this.consume();
     let value = '';
     
-    const hexChars = /[0-9a-fA-F]/; // HEX can be 3 or 6 characters
-    while (hexChars.test(this.peek() ?? "") && value.length < 6) {
+    const hexChars = /[0-9a-fA-F]/; // HEX can be 3, 6 or 8 characters
+    while (hexChars.test(this.peek() ?? "") && value.length < 8) {
       value += this.consume();
     }
     
@@ -218,25 +239,67 @@ class Tokenizer {
 
   private parseNumber(): TokenValue {
     let value = '';
-    
+    let hasFraction = false;
+    let hasDecimal = false;
+    let hasNegativeSign = false;
+
+    if (this.peek() === '-' && this.isDigit(this.peekNext())) {
+      hasNegativeSign = true;
+      value += this.consume();
+    }
+
     while (this.isDigit(this.peek())) {
       value += this.consume();
     }
-    
+
     if (this.peek() === '.' && this.isDigit(this.peekNext())) {
+      hasDecimal = true;
+      value += this.consume();
+      while (this.isDigit(this.peek())) {
+        value += this.consume();
+      }
+    } else if (this.peek() === '/' && this.isDigit(this.peekNext())) {
+      hasFraction = true;
       value += this.consume();
       while (this.isDigit(this.peek())) {
         value += this.consume();
       }
     }
-    
+
+    let unit = '';
     while (this.isLetter(this.peek())) {
+      unit += this.consume();
+    }
+
+    const fullValue = value + unit;
+
+    if (unit) {
+      return { key: "VALUE", value: fullValue };
+    } else if (hasFraction || hasDecimal) {
+      return { key: "VALUE", value: fullValue };
+    } else {
+      return { key: "VALUE", value: Number(value) };
+    }
+  }
+  
+  private parseMediaQuery(): TokenValue {
+    this.consume(); // '@'
+    let value = '';
+    
+    if (this.peek() === '{') {
+      this.consume(); // '{'
+      while (!this.isAtEnd() && this.peek() !== '}') {
+        value += this.consume();
+      }
+      if (this.peek() === '}') this.consume();
+      return { key: "MEDIA_VARIABLE_REF", ref: value };
+    }
+    
+    while (!this.isAtEnd() && !this.isWhitespace(this.peek())) {
       value += this.consume();
     }
     
-    const numericValue = /[a-zA-Z]/.test(value) ? value : Number(value);
-    
-    return { key: "VALUE", value: numericValue };
+    return { key: "MEDIA_VALUE", value };
   }
 
   private parseIdentifier(): TokenValue {
@@ -247,12 +310,41 @@ class Tokenizer {
       value += this.consume();
     }
     
-    if (IDENTIFIERS_SET.has(value as Identifier)) {
+    if (IDENTIFIERS_SET.has(value as Identifier | never)) {
       return { key: "IDENTIFIER", value: value as Identifier };
     }
     
     throw this.error(`Невідомий ідентифікатор: $${value}`);
   }
+
+  private parsePseudoClass(): TokenValue {
+    this.consume();
+    let value = '';
+    let depth = 0;
+
+    while (!this.isAtEnd()) {
+      const char = this.peek();
+
+      if (char === '(') {
+        depth++;
+        value += this.consume();
+      } else if (char === ')') {
+        if (depth === 0) break;
+        depth--;
+        value += this.consume();
+      } else if (depth > 0 || this.isPseudoClass(char)) {
+        value += this.consume();
+      } else {
+        break;
+      }
+    }
+
+    if (PSEUDO_CLASSES_SET.has(value as PseudoClass | never)) {
+      return { key: "PSEUDO_CLASS", value: `:${value}` as PseudoClass };
+    }
+
+    throw this.error(`Невідомий псевдоклас: :${value}`);
+}
 
   private parseWord(): TokenValue {
     let value = '';
@@ -261,12 +353,24 @@ class Tokenizer {
       value += this.consume();
     }
     
-    if (KEYWORDS_SET.has(value as Keyword)) {
+    if (KEYWORDS_SET.has(value as Keyword | never)) {
       return { key: "KEYWORD", value: value as Keyword };
     }
-    
-    if (TOKEN_PROPERTIES_SET.has(value as TokenProperty)) {
-      return { key: "PROPERTY", value: value as TokenProperty };
+
+    if (CSS_VALUES_SET.has(value as CssValue | never) && this.tokens.at(-1)?.key !== "KEYWORD") {
+      return { key: 'VALUE', value };
+    }
+
+    const lastKeyword = this.tokens.findLast(token => token.key === "KEYWORD");
+    if (lastKeyword) {
+      const lastKeywordIndex = this.tokens.lastIndexOf(lastKeyword);
+      if (this.tokens.length === lastKeywordIndex + 1 && this.tokens[lastKeywordIndex]?.key === "KEYWORD" && lastKeyword.value === "VAR") {
+        return { key: "VARIABLE", value: value };
+      }
+      
+      if (PROPERTIES_SET.has(value as Property | never) && this.tokens[lastKeywordIndex + 1]?.key !== "PROPERTY") {
+        return { key: "PROPERTY", value: value as Property };
+      }
     }
     
     return { key: "VARIABLE", value };
@@ -280,9 +384,7 @@ class Tokenizer {
       value += this.consume();
     }
     
-    if (this.isAtEnd()) {
-      throw this.error('Незакрита дужка');
-    }
+    if (this.isAtEnd())  throw this.error('Unexpected end of input while parsing variable reference');
     
     this.consume();
     
@@ -294,7 +396,7 @@ class Tokenizer {
         typeValue += this.consume();
       }
       
-      if (VALUE_TYPES_SET.has(typeValue as ValueType)) {
+      if (VALUE_TYPES_SET.has(typeValue as ValueType | never)) {
         type = typeValue as ValueType;
       } else {
         throw this.error(`Неправильний тип: ${typeValue}`);
@@ -312,9 +414,9 @@ class Tokenizer {
       case '}': return { key: "RIGHT_BRACE" };
       case '[': return { key: "LEFT_BRACKET" };
       case ']': return { key: "RIGHT_BRACKET" };
-      case ',': return { key: "COMMA" };
+      case ',': return { key: "VALUE", value: ',' };
       case '=': return { key: "EQUALS" };
-      default: throw this.error(`Невідомий символ: ${char}`);
+      default: return { key: "UNKNOWN" };
     }
   }
 
@@ -332,6 +434,10 @@ class Tokenizer {
 
   private isIdentifierChar(char: string | undefined): boolean {
     return char ? /[a-zA-Z0-9_-]/.test(char) : false;
+  }
+
+  private isPseudoClass(char: string | undefined): boolean {
+    return char ? /[a-zA-Z0-9-:]/.test(char) : false;
   }
 
   private peek(): string | undefined {

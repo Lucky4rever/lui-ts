@@ -1,57 +1,49 @@
 import { ValueType } from "../consts/value-types";
 
 export type VariableValue = {
-  value: string | number;
-  type: ValueType | undefined;
+  values: (string | number)[];
+  types: (ValueType | undefined)[];
 };
 
 export class Store {
   private variables: Record<string, VariableValue> = {};
 
-  /**
-   * Додає змінну до сховища
-   * @param identifier Назва змінної
-   * @param value Значення змінної (число або рядок)
-   * @param type Тип значення (наприклад, "px", "%")
-   */
-  addVariable(identifier: string, value: string | number, type?: ValueType) {
-    this.variables[identifier] = { value, type };
+  addVariable(identifier: string, values: (string | number)[], types?: (ValueType | undefined)[]) {
+    this.variables[identifier] = { 
+      values: [...values],
+      types: types ? [...types] : Array(values.length).fill(undefined)
+    };
   }
 
-  /**
-   * Оновлює існуючу змінну
-   * @param identifier Назва змінної
-   * @param newValue Нове значення
-   * @param newType Новий тип (опціонально)
-   */
-  updateVariable(identifier: string, newValue: string | number, newType?: ValueType) {
+  updateVariable(identifier: string, newValues: (string | number)[], newTypes?: (ValueType | undefined)[]) {
     if (this.variables[identifier]) {
       this.variables[identifier] = { 
-        value: newValue,
-        type: newType ?? this.variables[identifier].type
+        values: [...newValues],
+        types: newTypes ? [...newTypes] : Array(newValues.length).fill(undefined)
       };
     }
   }
 
-  /**
-   * Повертає всі змінні
-   */
-  getVariables(): Record<string, VariableValue> {
-    return { ...this.variables }; // Повертаємо копію об'єкта
+  getVariables(): Record<string, string> {
+    const result: Record<string, string> = {};
+    for (const [name, variable] of Object.entries(this.variables)) {
+      result[name] = this.joinVariableValues(variable);
+    }
+    return result;
   }
 
-  /**
-   * Повертає конкретну змінну
-   * @param name Назва змінної
-   */
-  getVariable(name: string): VariableValue | undefined {
-    return this.variables[name];
+  getVariable(name: string): string | undefined {
+    const variable = this.variables[name];
+    if (!variable) return undefined;
+    return this.joinVariableValues(variable);
   }
 
-  /**
-   * Видаляє змінну
-   * @param name Назва змінної
-   */
+  private joinVariableValues(variable: VariableValue): string {
+    return variable.values
+      .map((value, i) => `${value}${variable.types[i] || ''}`)
+      .join(' ');
+  }
+
   removeVariable(name: string): boolean {
     if (this.variables[name]) {
       delete this.variables[name];
@@ -60,9 +52,6 @@ export class Store {
     return false;
   }
 
-  /**
-   * Очищає всі змінні
-   */
   clearVariables(): void {
     this.variables = {};
   }

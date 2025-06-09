@@ -1,6 +1,6 @@
 {
   "name": "lui-ts",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "",
   "main": "dist/index.js",
   "files": [
@@ -11,11 +11,13 @@
     "lui": "./dist/index.js"
   },
   "scripts": {
-    "start": "tsc && node dist/index.js",
+    "start": "tsc && node dist/src/index.js",
     "dev": "pnpm start ./temp/test7.lui ./temp/output.css --class-format=minimalistic --mode=minimalistic --layers=false",
     "build:not-working": "swc src --out-dir dist --strip-leading-paths",
     "prepublishOnly": "tsc",
-    "build": "tsc"
+    "build": "tsc",
+    "test": "vitest",
+    "coverage": "vitest run --coverage"
   },
   "keywords": [],
   "author": "",
@@ -24,6 +26,8 @@
     "@swc/cli": "^0.7.3",
     "@swc/core": "^1.11.24",
     "@types/node": "^22.13.5",
-    "typescript": "^5.8.3"
+    "@vitest/coverage-v8": "^3.2.2",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.2"
   }
 }

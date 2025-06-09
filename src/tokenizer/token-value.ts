@@ -1,7 +1,8 @@
+import { PseudoClass } from "../consts/css-seudo-classes";
 import { Identifier } from "../consts/identifiers";
 import { Keyword } from "../consts/keywords";
 import { OtherToken } from "../consts/other-tokens";
-import { TokenProperty } from "../consts/token-property";
+import { Property } from "../consts/token-property";
 import { ValueType } from "../consts/value-types";
 
 export type TokenValue = 
@@ -11,7 +12,11 @@ export type TokenValue =
   }
   | {
     key: 'PROPERTY';
-    value: TokenProperty;
+    value: Property;
+  }
+  | {
+    key: 'MEDIA_VALUE';
+    value: string | number;
   }
   | {
     key: 'VALUE_TYPE';
@@ -24,6 +29,15 @@ export type TokenValue =
   | {
     key: 'IDENTIFIER';
     value: Identifier;
+  }
+  | {
+    key: 'PSEUDO_CLASS';
+    value: PseudoClass;
+  }
+  | {
+    key: 'MEDIA_VARIABLE_REF';
+    ref: string;
+    type?: ValueType;
   }
   | {
     key: 'VARIABLE';

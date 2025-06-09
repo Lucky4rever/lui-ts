@@ -3,7 +3,6 @@ const OTHER_TOKENS = [
   'RIGHT_BRACE',
   'LEFT_BRACKET',
   'RIGHT_BRACKET',
-  'COMMA',
   'EQUALS',
   'NEWLINE',
 ] as const;

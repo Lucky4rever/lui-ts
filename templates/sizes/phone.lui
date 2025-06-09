@@ -1,0 +1,11 @@
+VAR phone-xxs = 320px   // Дуже маленькі телефони (наприклад, iPhone 5/SE)
+VAR phone-xs  = 360px   // Маленькі телефони (стандартні Android)
+VAR phone-s   = 375px   // iPhone 6/7/8/X
+VAR phone-m   = 414px   // Великі телефони (iPhone Plus, Pixel XL)
+VAR phone-l   = 480px   // Рідкісні великі телефони (старі моделі)
+
+VAR pn-xxs = 320px
+VAR pn-xs  = 360px
+VAR pn-s   = 375px
+VAR pn-m   = 414px
+VAR pn-l   = 480px

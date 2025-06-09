@@ -1,12 +1,12 @@
 import { Identifier } from "../consts/identifiers";
-import { Property, PROPERTIES_SET } from "../consts/properties";
-import { TokenProperty } from "../consts/token-property";
+import { Property, PROPERTIES_SET } from "../consts/token-property";
+import { ValueType } from "../consts/value-types";
 import { Store } from "../store/store";
 import { TokenValue } from "../tokenizer/token-value";
 import { ProcessedValue } from "./processed-value";
 
-function expandProperty(property: TokenProperty, identifier: Identifier): Property[] {
-  if (identifier === "none") {
+function expandProperty(property: Property, identifier: Identifier): Property[] {
+  if (identifier === "base") {
     return [property as Property];
   }
   
@@ -16,7 +16,7 @@ function expandProperty(property: TokenProperty, identifier: Identifier): Proper
     return availableProperties;
   }
 
-  const identifiedProperties = availableProperties.filter((p) => p.includes(identifier));
+  const identifiedProperties = availableProperties.filter((p) => p.substring(p.indexOf('-') + 1, p.length) === identifier);
 
   return identifiedProperties;
 }
@@ -28,8 +28,8 @@ class Parser {
     this.store = store;
   }
 
-  process(tokens: TokenValue[]): ProcessedValue[] {
-    const processedValues: ProcessedValue[] = [];
+  parse(tokens: TokenValue[]): ProcessedValue[] {
+    const parsedValues: ProcessedValue[] = [];
     const groupedTokens = this.groupTokensByLine(tokens);
 
     for (const lineTokens of groupedTokens) {
@@ -37,7 +37,7 @@ class Parser {
       
       // Обробка токенів LAYER
       if (lineTokens[0]?.key === "LAYER") {
-        processedValues.push({
+        parsedValues.push({
           property: "LAYER",
           values: [lineTokens[0].name, lineTokens[0].action]
         });
@@ -46,16 +46,13 @@ class Parser {
 
       if (lineTokens[0] === undefined) continue;
       if (lineTokens[0].key === "NEWLINE") continue;
-      if (lineTokens[0].key === "COMMENT" && lineTokens[0].type === "PRIVATE") continue;
-      if (lineTokens[0].key === "COMMENT" && lineTokens[0].type === "PUBLIC") {
-        processedValues.push(...this.processComment(lineTokens));
-        continue;
-      }
 
-      processedValues.push(...this.processInlineTokens(lineTokens));
+      parsedValues.push(...this.parseInlineTokens(lineTokens));
     }
 
-    return this.removeDuplicates(processedValues);
+    const parsedUniqueValues = this.removeDuplicates(parsedValues);
+    const parsedNonEmptyValues = this.removeEmptyLayers(parsedUniqueValues);
+    return parsedNonEmptyValues;
   }
 
   private groupTokensByLine(tokens: TokenValue[]): TokenValue[][] {
@@ -86,8 +83,8 @@ class Parser {
     return grouped;
   }
 
-  private processInlineTokens(tokens: TokenValue[]): ProcessedValue[] {
-    const processedValues: ProcessedValue[] = [];
+  private parseInlineTokens(tokens: TokenValue[]): ProcessedValue[] {
+    const parsedValues: ProcessedValue[] = [];
 
     const groupedTokensByKey = tokens.reduce((acc, token) => {
       if (!acc[token.key]) {
@@ -101,12 +98,14 @@ class Parser {
     if (commentTokens) {
       for (const commentToken of commentTokens) {
         if (commentToken.key !== "COMMENT") continue;
-        processedValues.push({ property: "COMMENT", values: [commentToken.value] });
+        if (commentToken.type === "PRIVATE") continue;
+        parsedValues.push({ property: "COMMENT", values: [commentToken.value] });
       }
     }
+    if (tokens[0]?.key === "COMMENT")  return parsedValues;
     
     const keywordTokens = groupedTokensByKey["KEYWORD"];
-    if (!keywordTokens || keywordTokens[0]?.key !== "KEYWORD") throw new Error("Invalid line - no keyword found");
+    if (!keywordTokens || keywordTokens[0]?.key !== "KEYWORD") throw new Error(`Invalid line - no keyword found: ${JSON.stringify(tokens)}`);
     if (keywordTokens.length > 1)  throw new Error("Invalid line - multiple keywords found");
     
     const keywordToken = keywordTokens[0];
@@ -114,97 +113,158 @@ class Parser {
     const keyword = keywordToken.value;
     const propertyTokens = groupedTokensByKey["PROPERTY"];
     const valueTokens = groupedTokensByKey["VALUE"];
+    const valueTypeTokens = groupedTokensByKey["VALUE_TYPE"];
     const identifierTokens = groupedTokensByKey["IDENTIFIER"];
+    const pseudoClassTokens = groupedTokensByKey["PSEUDO_CLASS"];
     const variableTokens = groupedTokensByKey["VARIABLE"];
     const variableRefTokens = groupedTokensByKey["VARIABLE_REF"];
+    const mediaValueTokens = groupedTokensByKey["MEDIA_VALUE"];
+    const mediaRefTokens = groupedTokensByKey["MEDIA_VARIABLE_REF"];
 
     switch (keyword) {
       case "ADD":
-        const processedAdd = this.processAdd(propertyTokens, identifierTokens, valueTokens, variableTokens, variableRefTokens);
-        processedValues.push(...processedAdd);
+        const parsedAdd = this.parseAdd(
+          propertyTokens, 
+          identifierTokens, 
+          pseudoClassTokens, 
+          mediaValueTokens,
+          mediaRefTokens,
+          valueTokens, 
+          valueTypeTokens,
+          variableTokens, 
+          variableRefTokens
+        );
+        parsedValues.push(...parsedAdd);
         break;
       
       case "IMPORT":
         break;
 
       case "VAR":
-        const processedVar = this.processVar(variableTokens, valueTokens);
-        processedValues.push(...processedVar);
+        const parsedVar = this.parseVar(variableTokens, valueTokens);
+        parsedValues.push(...parsedVar);
         break;
 
       default:
         throw new Error(`Invalid keyword: ${keyword}`);
     }
 
-    return processedValues;
+    return parsedValues;
   }
 
-  private processAdd(
+  private parseAdd(
     propertyTokens: TokenValue[] | undefined,
     identifierTokens: TokenValue[] | undefined,
+    pseudoClassTokens: TokenValue[] | undefined,
+    mediaValueTokens: TokenValue[] | undefined,
+    mediaRefTokens: TokenValue[] | undefined,
     valueTokens: TokenValue[] | undefined,
+    valueTypeTokens: TokenValue[] | undefined,
     variableTokens: TokenValue[] | undefined,
     variableRefTokens: TokenValue[] | undefined
-  ): ProcessedValue[] {
-    const processedValues: ProcessedValue[] = [];
+): ProcessedValue[] {
+  const parsedValues: ProcessedValue[] = [];
 
-    if (!propertyTokens || propertyTokens.length === 0) {
-      throw new Error("ADD statement requires at least one property");
-    }
-  
-    const propertyToken = propertyTokens[0];
-    if (propertyToken?.key !== "PROPERTY") {
-      throw new Error("Invalid property token in ADD statement");
-    }
-  
-    const allValueTokens = [
-      ...(valueTokens || []),
-      ...(variableTokens?.map(token => {
-        if (token.key === "VARIABLE") {
-          return { key: 'VALUE', value: token.value } as TokenValue;
-        }
-        throw new Error(`Invalid token type in variableTokens: ${token.key}`);
-      }) || []),
-      ...(variableRefTokens || [])
-    ];
-
-    if (allValueTokens.length === 0) {
-      throw new Error("ADD statement requires at least one value");
-    }
-  
-    const values = allValueTokens.map(token => {
-      if (token.key === "VALUE") {
-        return this.resolveValue(token, undefined);
-      } else if (token.key === "VARIABLE_REF") {
-        return this.resolveVariableRef(token);
-      }
-      throw new Error(`Invalid value token type: ${token.key}`);
-    });
-
-    let expandedProperties: string[] = [];
-  
-    if (identifierTokens && identifierTokens.length > 0) {
-      identifierTokens.forEach(identifierToken => {
-        if (identifierToken.key !== "IDENTIFIER") {
-          throw new Error("Invalid identifier token in ADD statement");
-        }
-        const identifier = identifierToken.value as Identifier;
-        expandedProperties = [...expandedProperties, ...expandProperty(propertyToken.value, identifier)];
-      });
-    } else {
-      expandedProperties = expandProperty(propertyToken.value, "none");
-    }
-  
-  
-    for (const property of expandedProperties) {
-      processedValues.push({
-        property,
-        values: [...values]
-      });
-    }
-  
-    return processedValues;
+  if (!propertyTokens || propertyTokens.length === 0) {
+    throw new Error("ADD statement requires at least one property");
   }
+
+  const propertyToken = propertyTokens[0];
+  if (propertyToken?.key !== "PROPERTY") {
+    throw new Error("Invalid property token in ADD statement");
+  }
+
+  let mediaCondition: string | undefined;
+  if (mediaValueTokens && mediaValueTokens.length > 0 && mediaValueTokens[0]!!.key === "MEDIA_VALUE") {
+      mediaCondition = `(min-width: ${mediaValueTokens[0]!!.value})`;
+  } else if (mediaRefTokens && mediaRefTokens.length > 0 && mediaRefTokens[0]!!.key === "MEDIA_VARIABLE_REF") {
+    // @ts-ignore
+    const varName = mediaRefTokens[0]!!.ref;
+    const varValue = this.store.getVariable(varName);
+    if (varValue) mediaCondition = `(min-width: ${varValue})`;
+  }
+
+  // Обробка псевдокласів
+  const pseudoClassToken = pseudoClassTokens?.[0];
+  if (pseudoClassToken && pseudoClassToken.key !== "PSEUDO_CLASS") {
+    throw new Error("Invalid pseudo class token in ADD statement");
+  }
+
+  // Обробка значень
+  let i = -1;
+
+  const combinedValueTokens = valueTokens?.map(token => {
+    if (token.key !== "VALUE" && token.key !== "VARIABLE_REF") {
+      throw new Error(`Invalid value token type: ${token.key}`);
+    }
+    i++;
+    if (valueTypeTokens?.[i]?.key !== "VALUE_TYPE") {
+      return token;
+    }
+    if (token.key === "VALUE" && valueTypeTokens?.[i]?.key) {
+      //@ts-ignore
+      return { ...token, value: `${token.value}${valueTypeTokens?.[i].value ?? ''}` } as TokenValue;
+    }
+    throw new Error(`Invalid token type: ${token.key}`);
+  }) || [];
+
+  const allValueTokens = [
+    ...combinedValueTokens,
+    ...(variableTokens?.map(token => {
+      if (token.key === "VARIABLE") {
+        return { key: 'VALUE', value: token.value } as TokenValue;
+      }
+      throw new Error(`Invalid token type in variableTokens: ${token.key}`);
+    }) || []),
+    ...(variableRefTokens || [])
+  ];
+
+  if (allValueTokens.length === 0) {
+    throw new Error("ADD statement requires at least one value");
+  }
+
+  const values = allValueTokens.map(token => {
+    if (token.key === "VALUE") {
+      return token.value.toString();
+    } else if (token.key === "VARIABLE_REF") {
+      return this.resolveVariableRef(token);
+    }
+    throw new Error(`Invalid value token type: ${token.key}`);
+  });
+
+  // Розширення властивостей за ідентифікаторами
+  let expandedProperties: string[] = [];
+  if (identifierTokens && identifierTokens.length > 0) {
+    identifierTokens.forEach(identifierToken => {
+      if (identifierToken.key !== "IDENTIFIER") {
+        throw new Error("Invalid identifier token in ADD statement");
+      }
+      const identifier = identifierToken.value as Identifier;
+      expandedProperties = [...expandedProperties, ...expandProperty(propertyToken.value, identifier)];
+    });
+  } else {
+    expandedProperties = expandProperty(propertyToken.value, "base");
+  }
+
+  // Формування результату
+  for (const expandedProperty of expandedProperties) {
+    if (!PROPERTIES_SET.has(expandedProperty as Property)) {
+      throw new Error(`Invalid property: ${expandedProperty}`);
+    }
+
+    //@ts-ignore
+    const refNames = variableRefTokens?.map(t => t.ref) || [];
+    parsedValues.push({
+      property: expandedProperty as Property,
+      values: [...values],
+      optionalName: refNames.length > 0 ? refNames.join('-') : undefined,
+      pseudoClass: pseudoClassToken ? pseudoClassToken.value : undefined,
+      media: mediaCondition
+    });
+  }
+
+  return parsedValues;
+}
   
   getVariables() {
     return this.store.getVariables();
@@ -212,17 +272,26 @@ class Parser {
   
   private resolveVariableRef(token: TokenValue): string {
     if (token.key !== "VARIABLE_REF") {
-      throw new Error(`Invalid token type for variable reference: ${token.key}`);
+    throw new Error(`Invalid token type for variable reference: ${token.key}`);
     }
 
     const variable = this.store.getVariable(token.ref);
     if (!variable) {
       throw new Error(`Variable not found: ${token.ref}`);
     }
-    return `${variable.value}${variable.type || ""}`;
+
+    if (/(px|rem|em|%|vw|vh|vmin|vmax|cm|mm|in|pt|pc|ex|ch)$/.test(variable)) {
+      return variable;
+    }
+
+    if (token.type) {
+      return `${variable}${token.type}`;
+    }
+
+    return variable;
   }
   
-  private processVar(
+  private parseVar(
     variableTokens: TokenValue[] | undefined,
     valueTokens: TokenValue[] | undefined
   ): ProcessedValue[] {
@@ -231,7 +300,7 @@ class Parser {
     }
   
     if (!valueTokens || valueTokens.length === 0) {
-      throw new Error("VAR statement requires a value");
+      throw new Error("VAR statement requires values");
     }
   
     const variableToken = variableTokens[0];
@@ -239,65 +308,98 @@ class Parser {
       throw new Error("Invalid variable token in VAR statement");
     }
   
-    const valueToken = valueTokens[0];
-    if (valueToken?.key !== "VALUE") {
-      throw new Error("Invalid value token in VAR statement");
+    const values: (string | number)[] = [];
+    const types: (ValueType | undefined)[] = [];
+  
+    for (const token of valueTokens) {
+      if (token.key === "VALUE") {
+        const parsed = this.extractValueAndType(token.value);
+        values.push(parsed.value);
+        types.push(parsed.type);
+      } else if (token.key === "VARIABLE_REF") {
+        const variable = this.store.getVariable(token.ref);
+        if (variable) {
+          values.push(variable);
+        } else {
+          throw new Error(`Variable not found: ${token.ref}`);
+        }
+        types.push(token.type);
+      }
     }
-
-    let valueTypeToken: TokenValue | undefined;
   
-    if (valueTokens.length > 1 && valueTokens[1]?.key === "VALUE_TYPE") {
-      valueTypeToken = valueTokens[1];
-    }
-  
-    this.store.addVariable(
-      variableToken.value,
-      valueToken.value,
-      valueTypeToken?.key === "VALUE_TYPE" ? valueTypeToken.value : undefined
-    );
-  
+    this.store.addVariable(variableToken.value, values, types);
     return [];
   }
-
-  private processComment(tokens: TokenValue[]): ProcessedValue[] {
-    const commentToken = tokens[0];
-    if (commentToken?.key !== "COMMENT") {
-      throw new Error("Invalid comment token");
+  
+  private extractValueAndType(rawValue: string | number): { value: string | number, type?: ValueType } {
+    const strValue = String(rawValue);
+    const numericPattern = /^(-?\d*\.?\d+)(px|em|rem|%|vw|vh|vmin|vmax|ch|ex|mm|cm|in|pt|pc)?$/;
+    const match = strValue.match(numericPattern);
+  
+    if (!match) {
+      return { value: rawValue };
     }
-
-    const commentValue = commentToken.value;
-    return [{
-      property: "COMMENT",
-      values: [commentValue],
-    }];
+  
+    const [, numStr, unit] = match;
+    return {
+      value: unit ? numStr ?? "" : rawValue,
+      type: unit as ValueType | undefined
+    };
   }
-
-  private resolveValue(valueToken: TokenValue, valueTypeToken?: TokenValue): string {
+  
+  private resolveValue(valueToken: TokenValue): string {
     let value = "";
-
+    
     if (valueToken.key === "VALUE") {
-      value = `${(valueToken as { value: string | number }).value}`;
+      value = this.formatValueWithType(valueToken.value);
     } else if (valueToken.key === "VARIABLE_REF") {
       const variable = this.store.getVariable(valueToken.ref);
       if (variable) {
-        value = `${variable.value}${variable.type || ""}`;
+        value = variable;
       } else {
         throw new Error(`Variable not found: ${valueToken.ref}`);
+      }
+      
+      if (valueToken.type) {
+        value = this.appendTypeToValue(value, valueToken.type);
       }
     } else {
       throw new Error(`Invalid value token: ${JSON.stringify(valueToken)}`);
     }
-
-    if (valueTypeToken?.key === "VALUE_TYPE") {
-      value += valueTypeToken.value;
-    }
-
+    
     return value;
+  }
+
+  private formatValueWithType(rawValue: string | number): string {
+    if (typeof rawValue === 'number') {
+      return rawValue.toString();
+    }
+    
+    if (/(px|rem|em|%|vw|vh|vmin|vmax|cm|mm|in|pt|pc|ex|ch)$/.test(rawValue)) {
+      return rawValue;
+    }
+    
+    if (/^\d+\.\d+$/.test(rawValue)) {
+      return rawValue;
+    }
+    
+    if (/^\d+\/\d+$/.test(rawValue)) {
+      return rawValue;
+    }
+    
+    return rawValue;
+  }
+
+  private appendTypeToValue(value: string, type: ValueType): string {
+    if (new RegExp(`${type}$`).test(value)) {
+      return value;
+    }
+    return `${value}${type}`;
   }
 
   private removeDuplicates(values: ProcessedValue[]): ProcessedValue[] {
     const uniqueValues: ProcessedValue[] = [];
-    const seen = new Map<string, boolean>();
+    const seen = new Set<string>();
 
     for (const item of values) {
       if (item.property === 'LAYER') {
@@ -308,12 +410,40 @@ class Parser {
       const key = `${item.property}:${JSON.stringify(item.values)}`;
       
       if (!seen.has(key)) {
-        seen.set(key, true);
+        seen.add(key);
         uniqueValues.push(item);
       }
     }
 
     return uniqueValues;
+  }
+
+  private removeEmptyLayers(values: ProcessedValue[]): ProcessedValue[] {
+    type Layer = {
+      property: string;
+      values: [name: string, action: "START" | "END"];
+    };
+    const nonEmptyValues: ProcessedValue[] = [];
+
+    if (values.length === 1)  return values
+
+    for (let i = 0; i < values.length - 1; i++) {
+      if (values[i]!!.property === "LAYER" && values[i + 1]!!.property === "LAYER") {
+        const layer: Layer = values[i] as Layer;
+        const nextLayer: Layer = values[i + 1] as Layer;
+
+        if (layer.values[0] === nextLayer.values[0] && layer.values[1] === "START" && nextLayer.values[1] === "END") {
+          i++;
+          continue;
+        } else {
+          nonEmptyValues.push(layer as ProcessedValue);
+        }
+      } else {
+        nonEmptyValues.push(values[i]!!);
+      }
+    }
+
+    return nonEmptyValues;
   }
 }
 

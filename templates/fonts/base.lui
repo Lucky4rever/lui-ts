@@ -1,0 +1,3 @@
+IMPORT (./define.lui)
+
+ADD font Arial, sans-serif
